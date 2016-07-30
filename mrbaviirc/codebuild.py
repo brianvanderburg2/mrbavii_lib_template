@@ -1,9 +1,8 @@
-# \file
-# \author Brian Allen Vanderburg II
-# \copyright MIT license
-# \date 2016
-#
-# This file provides a simple code builder.
+""" Provide a container for building code segments. """
+
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 
 class CodeBuilder(object):

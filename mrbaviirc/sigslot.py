@@ -1,14 +1,10 @@
-# File:     sigslot.py
-# Author:   Brian Vanderburg II
-# License:  Public domain
-# Updated:  Thursday, July 3, 2008
-########################################################################
+""" Provide a very basic signals-and-slots feature. """
 
-"""Signals and slots dispatching system.
-"""
+__author__      = "Brian Allen Vanderburg II"
+__copyright__   = "Copyright 2016"
+__license__     = "MIT"
 
 
-# Imports
 import weakref
 
 
