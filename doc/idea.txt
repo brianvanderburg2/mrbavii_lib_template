@@ -1,0 +1,95 @@
+Planned Changes/Ideas
+=====================
+
+Importable functions
+====================
+
+Status: Idea
+
+Register function libraries with more meaningful names. Allows template author
+to import to a specific variable if needed:
+
+
+fn()
+    return lib
+
+env.register("unique-name", fn)
+env.register("another-nane", fn2)
+
+
+{% import lib1 "unique-name" %}
+
+{% set data = lib1.getdata(...) %}
+ 
+Standard functions at top level
+===============================
+
+Status: Idea
+
+comparision:
+    lt(x, y)  x < y
+    le(x, y)  x <= y
+    gt(x, y)  x > y
+    ge(x, y)  x >= y
+    eq(x, y)  x == y
+    ne(x, y)  x != y
+    bt(x, y, z)  x >= y && x <= z
+
+operators
+    add(x, y)  x + y
+    sub(x, y)  x - y
+    mul(x, y)  x * y
+    div(x, y)  x / y
+    mod(x, y)  x % y
+    neg(x)     -x
+    inv(x)     ~x
+
+logic
+    not(x)     !x
+    and(x, y)  x and y
+    or(x, y)   x or y
+    xor(x, y)  x xor y
+
+conversion
+    str(x)
+    int(x)
+    float(x)
+    bool(x)
+
+Cache support
+=============
+
+Status: Idea
+
+File system loader should accept a timestamp
+    Return None if the on-disk file is not newer than timestamp
+
+When loading:
+
+    if cache is specified
+        data = loader.load(file, parent, time_of_cache_entry)
+        if data is None: # On-disk is not newer than cache:
+            try:
+                unpickle template nodes from cache
+            except:
+                data = loader.load(file, parent)
+                parse like normal
+                cache
+        else:
+            parse like normal
+            cache
+    else:
+        parse like normal
+        don't cache
+
+Pickle/Unpickle
+
+    Persistent id for template/env
+
+    when pickling
+        if object is template or env, return persistent id
+    when unpickling
+        if persistent id, return reference to template or env
+
+
+                
