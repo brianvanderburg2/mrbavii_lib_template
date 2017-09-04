@@ -16,11 +16,13 @@ from .sizer import SingleItemSizer
 __all__.append("ScrolledButtonBook")
 class ScrolledButtonBook(wx.Panel):
 
-    def __init__(self, parent, id=wx.ID_ANY, style=0):
+    def __init__(self, parent, id=wx.ID_ANY, style=wx.LEFT):
         """ Initialize the book control. """
 
         wx.Panel.__init__(self, parent, id)
         self._pages = []
+        self._style = style
+        self._dir = style & wx.ALL
         self.InitGUI()
 
     def InitGUI(self):
@@ -28,22 +30,32 @@ class ScrolledButtonBook(wx.Panel):
         # is split.  Top is an icon and a page text, bottom is the
         # contents of the control.
 
-        self._buttons = ScrolledButtonPanel(self, dir=wx.VERTICAL)
-        self._bitmap = wx.StaticBitmap(self, wx.ID_ANY, wx.NullBitmap)
-        self._text = wx.StaticText(self, wx.ID_ANY, "")
+        self._buttons = ScrolledButtonPanel(self, dir=wx.VERTICAL if self._dir in (wx.LEFT, wx.RIGHT) else wx.HORIZONTAL)
+        self._label = wx.Panel(self)
+        self._bitmap = wx.StaticBitmap(self._label, wx.ID_ANY, wx.NullBitmap)
+        self._text = wx.StaticText(self._label, wx.ID_ANY, "")
         self._panels = SingleItemSizer()
 
         labelSizer = wx.BoxSizer(wx.HORIZONTAL)
-        labelSizer.Add(self._bitmap, 0, wx.EXPAND)
-        labelSizer.Add(self._text, 1, wx.EXPAND)
+        labelSizer.AddF(self._bitmap, wx.SizerFlags(0).Expand().Border(wx.ALL))
+        labelSizer.AddF(self._text, wx.SizerFlags(1).Expand().Border(wx.ALL - wx.LEFT))
+        self._label.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_INFOBK))
+        self._text.SetForegroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_INFOTEXT))
+        self._label.SetSizer(labelSizer)
 
         areaSizer = wx.BoxSizer(wx.VERTICAL)
-        areaSizer.Add(labelSizer, 0, wx.EXPAND)
-        areaSizer.Add(self._panels, 1, wx.EXPAND)
+        areaSizer.AddF(self._label, wx.SizerFlags(0).Expand().Border(wx.BOTTOM))
+        areaSizer.AddF(self._panels, wx.SizerFlags(1).Expand())
 
-        topSizer = wx.BoxSizer(wx.HORIZONTAL)
-        topSizer.Add(self._buttons, 0, wx.EXPAND)
-        topSizer.Add(areaSizer, 1, wx.EXPAND)
+        topSizer = wx.BoxSizer(wx.HORIZONTAL if self._dir in (wx.LEFT, wx.RIGHT) else wx.VERTICAL)
+
+        if self._dir in (wx.LEFT, wx.TOP):
+            topSizer.AddF(self._buttons, wx.SizerFlags(0).Expand().Border(wx.RIGHT if self._dir == wx.LEFT else wx.BOTTOM))
+
+        topSizer.AddF(areaSizer, wx.SizerFlags(1).Expand())
+        
+        if self._dir in (wx.RIGHT, wx.BOTTOM):
+            topSizer.AddF(self._buttons, wx.SizerFlags(0).Expand().Border(wx.LEFT if self._dir == wx.RIGHT else wx.TOP))
 
         self.SetSizer(topSizer)
 
@@ -63,8 +75,14 @@ class ScrolledButtonBook(wx.Panel):
 
         (text, bitmap, window) = self._pages[index]
 
-        self._text.SetLabel(text)
         self._bitmap.SetBitmap(bitmap)
+
+        font = self._text.GetFont()
+        font.SetPixelSize((0, self._bitmap.GetSize().height))
+        self._text.SetFont(font)
+
+        self._text.SetLabel(text)
+
         self._panels.SetSelection(window)
         self.Layout()
 
@@ -76,13 +94,41 @@ def main():
         def __init__(self):
             wx.Frame.__init__(self, None, wx.ID_ANY, "Test")
 
-            book =  ScrolledButtonBook(self, wx.ID_ANY)
+            book =  ScrolledButtonBook(self, wx.ID_ANY, style=wx.LEFT)
 
             sizer = wx.BoxSizer(wx.HORIZONTAL)
-            sizer.Add(book, 1, wx.EXPAND)
+            sizer.AddF(book, wx.SizerFlags(1).Expand().Border(wx.ALL))
 
-            book.AddPage("Notes", wx.ArtProvider.GetBitmap(wx.ART_ERROR), wx.StaticText(book, wx.ID_ANY, "HAHAAH"))
-            book.AddPage("Poop", wx.ArtProvider.GetBitmap(wx.ART_WARNING), wx.StaticText(book, wx.ID_ANY, "Hol"))
+            # Fake page 1
+            panel = wx.Panel(book)
+            text = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER | wx.TE_MULTILINE)
+            tree = wx.TreeCtrl(panel)
+
+            sz = wx.BoxSizer(wx.HORIZONTAL)
+            sz.AddF(text, wx.SizerFlags(1).Expand().Border(wx.RIGHT))
+            sz.AddF(tree, wx.SizerFlags(1).Expand())
+            panel.SetSizer(sz)
+
+            book.AddPage("Page1", wx.ArtProvider.GetBitmap(wx.ART_ERROR, size=(32,32)), panel)
+
+            # Fake page 2
+            panel = wx.Panel(book)
+            button = wx.Button(panel, wx.ID_ANY, "Revert")
+            button2 = wx.Button(panel, wx.ID_ANY, "Save")
+            text = wx.TextCtrl(panel, style=wx.TE_MULTILINE)
+
+            sz1 = wx.BoxSizer(wx.HORIZONTAL)
+            sz1.AddStretchSpacer(1)
+            sz1.AddF(button, wx.SizerFlags(0).Center().Border(wx.RIGHT))
+            sz1.AddF(button2, wx.SizerFlags(0).Center().Border(wx.LEFT))
+            sz1.AddStretchSpacer(1)
+
+            sz2 = wx.BoxSizer(wx.VERTICAL)
+            sz2.AddF(sz1, wx.SizerFlags(0).Expand().Border(wx.BOTTOM))
+            sz2.AddF(text, wx.SizerFlags(1).Expand())
+            
+            panel.SetSizer(sz2)
+            book.AddPage("Page2", wx.ArtProvider.GetBitmap(wx.ART_WARNING, size=(32,32)), panel)
 
             self.SetSizerAndFit(sizer)
             self.SetAutoLayout(1)
