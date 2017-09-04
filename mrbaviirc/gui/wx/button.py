@@ -31,7 +31,7 @@ class _ScrolledButtonPanelItem(object):
 class ScrolledButtonPanel(scrolled.ScrolledPanel):
     """ A panel which can have buttons added to it. """
 
-    def __init__(self, parent=None, id=wx.ID_ANY, dir=wx.HORIZONTAL, border=0, spacing=0):
+    def __init__(self, parent=None, id=wx.ID_ANY, dir=wx.HORIZONTAL, border=-1, spacing=-1):
         scrolled.ScrolledPanel.__init__(self, parent, id)
 
         if dir == wx.HORIZONTAL:
@@ -41,16 +41,21 @@ class ScrolledButtonPanel(scrolled.ScrolledPanel):
 
         self._buttons = []
         self._dir = dir
-        self._border = border
-        self._spacing = spacing
-        self._sizer = wx.BoxSizer(dir)
+        self._border = wx.SizerFlags.GetDefaultBorder() if border == -1 else border
+        self._spacing = wx.SizerFlags.GetDefaultBorder() if border == -1 else spacing
+        self._sizer = wx.GridSizer(0, 1, spacing, 0)
+
+        self._topsizer = wx.BoxSizer(wx.VERTICAL)
+        self._topsizer.AddF(self._sizer, wx.SizerFlags(0).Expand().Border(wx.ALL, self._border))
+        self._topsizer.AddStretchSpacer(1)
+
 
         if dir == wx.HORIZONTAL:
             self._scrollbar_size = wx.SystemSettings.GetMetric(wx.SYS_HSCROLL_Y)
         else:
             self._scrollbar_size = wx.SystemSettings.GetMetric(wx.SYS_VSCROLL_X)
 
-        self.SetSizer(self._sizer)
+        self.SetSizer(self._topsizer)
         self.SetAutoLayout(1)
         self.SetupScrolling()
 
@@ -58,12 +63,12 @@ class ScrolledButtonPanel(scrolled.ScrolledPanel):
 
     def Update(self):
         if self._dir == wx.HORIZONTAL:
-            size = wx.Size(self.GetMinSize().width, self._sizer.GetMinSize().height + self._scrollbar_size)
+            size = wx.Size(self.GetMinSize().width, self._topsizer.GetMinSize().height + self._scrollbar_size)
             #for item in self._sizer.GetChildren():
             #    size.IncTo(item.CalcMin())
             self.SetMinSize(size)
         else:
-            size = wx.Size(self._sizer.GetMinSize().width + self._scrollbar_size, self.GetMinSize().height)
+            size = wx.Size(self._topsizer.GetMinSize().width + self._scrollbar_size, self.GetMinSize().height)
             #for item in self._sizer.GetChildren():
             #    size.IncTo(item.CalcMin())
             self.SetMinSize(size)
@@ -83,8 +88,6 @@ class ScrolledButtonPanel(scrolled.ScrolledPanel):
         if bitmap.IsOk():
             btn.window.SetBitmap(bitmap, 0 if dir is None else dir)
 
-        if len(self._buttons):
-            self._sizer.AddSpacer(self._spacing)
         self._sizer.Add(btn.window, 0, wx.EXPAND | wx.ALL, self._border)
 
         self._buttons.append(btn)
@@ -98,15 +101,6 @@ class ScrolledButtonPanel(scrolled.ScrolledPanel):
 
         btn = self._buttons.pop(index)
         btn.window.Destroy()
-        if len(self._buttons): # If there were more buttons, a spacer existed between some
-            if index == 0:
-                # Removed the first button, so remove the spacer after it, which
-                # is now in sizer position 0
-                self._sizer.Remove(0)
-            else:
-                # Removed another button that wasn't the first, remove the spacer
-                # before it
-                self._sizer.Remove(2 * index - 1)
                 
         self.Update()
 
@@ -191,7 +185,7 @@ def main():
         def __init__(self):
             wx.Frame.__init__(self, None, wx.ID_ANY, "Test")
 
-            scrolled = ScrolledButtonPanel(self, wx.ID_ANY, wx.VERTICAL, 5, 15)
+            scrolled = ScrolledButtonPanel(self, wx.ID_ANY, wx.VERTICAL, 10, 10)
 
             scrolled.AddButton(wx.ID_ANY, "Home", wx.ArtProvider.GetBitmap(wx.ART_ERROR), wx.TOP)
             scrolled.AddButton(wx.ID_ANY, "Home And Back to Home", wx.ArtProvider.GetBitmap(wx.ART_ERROR), wx.TOP)
