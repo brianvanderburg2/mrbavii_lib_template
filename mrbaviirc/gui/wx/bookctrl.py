@@ -16,13 +16,15 @@ from .sizer import SingleItemSizer
 __all__.append("ScrolledButtonBook")
 class ScrolledButtonBook(wx.Panel):
 
-    def __init__(self, parent, id=wx.ID_ANY, style=wx.LEFT):
+    def __init__(self, parent, id=wx.ID_ANY, style=wx.LEFT, border=-1, spacing=-1):
         """ Initialize the book control. """
 
         wx.Panel.__init__(self, parent, id)
         self._pages = []
         self._style = style
         self._dir = style & wx.ALL
+        self._border = border
+        self._spacing = spacing
         self.InitGUI()
 
     def InitGUI(self):
@@ -30,7 +32,11 @@ class ScrolledButtonBook(wx.Panel):
         # is split.  Top is an icon and a page text, bottom is the
         # contents of the control.
 
-        self._buttons = ScrolledButtonPanel(self, dir=wx.VERTICAL if self._dir in (wx.LEFT, wx.RIGHT) else wx.HORIZONTAL)
+        self._buttons = ScrolledButtonPanel(
+            self, wx.ID_ANY, 
+            wx.VERTICAL if self._dir in (wx.LEFT, wx.RIGHT) else wx.HORIZONTAL,
+            self._border, self._spacing
+        )
         self._label = wx.Panel(self)
         self._bitmap = wx.StaticBitmap(self._label, wx.ID_ANY, wx.NullBitmap)
         self._text = wx.StaticText(self._label, wx.ID_ANY, "")
@@ -61,7 +67,7 @@ class ScrolledButtonBook(wx.Panel):
 
         self.Bind(EVT_SCROLLED_BUTTON_CLICKED, self.OnClick)
 
-    def AddPage(self, text, bitmap, window):
+    def AddPage(self, window, text, bitmap):
         page = (text, bitmap, window)
         self._pages.append(page)
 
@@ -109,7 +115,7 @@ def main():
             sz.AddF(tree, wx.SizerFlags(1).Expand())
             panel.SetSizer(sz)
 
-            book.AddPage("Page1", wx.ArtProvider.GetBitmap(wx.ART_ERROR, size=(32,32)), panel)
+            book.AddPage(panel, "Page1", wx.ArtProvider.GetBitmap(wx.ART_ERROR, size=(32,32)))
 
             # Fake page 2
             panel = wx.Panel(book)
@@ -128,7 +134,7 @@ def main():
             sz2.AddF(text, wx.SizerFlags(1).Expand())
             
             panel.SetSizer(sz2)
-            book.AddPage("Page2", wx.ArtProvider.GetBitmap(wx.ART_WARNING, size=(32,32)), panel)
+            book.AddPage(panel, "Page2", wx.ArtProvider.GetBitmap(wx.ART_WARNING, size=(32,32)))
 
             self.SetSizerAndFit(sizer)
             self.SetAutoLayout(1)
