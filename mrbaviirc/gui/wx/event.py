@@ -1,17 +1,20 @@
-""" Modification of wx.lib.newevent to allow creation of multiple event types for a single event class. """
+""" Event related functions and classes. """
+
+# Portions of the below are inspired by wx.lib.newevent
 
 from __future__ import absolute_import
 
-__author__      =   "Brian Allen Vanderburg II, inspired by code in wx.lib.newevent"
+__author__      =   "Brian Allen Vanderburg II"
 __copyright__   =   "Copyright (C) 2016 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
+
+__all__ = [
+    "NewEventTypes", "NewEvents", "NewCommandEvents", "NotifyEvent"
+]
 
 import itertools
 
 import wx
-
-
-__all__ = ["NewEventTypes", "NewEvents", "NewCommandEvents"]
 
 
 def NewEventTypes(count=1, expectedIDs=0):
@@ -32,9 +35,9 @@ def NewEventTypes(count=1, expectedIDs=0):
     
     """
 
-    # Note: These are generators, once used tehy will be exhuasted
+    # Note: These are generators, once used they will be exhuasted
     evttypes = (wx.NewEventType() for i in range(count))
-    tyeps_and_binders = ((i, wx.PyEventBinder(i, expectedIDs)) for i in evttypes)
+    types_and_binders = ((i, wx.PyEventBinder(i, expectedIDs)) for i in evttypes)
 
     return tuple(itertools.chain(*types_and_binders))
 
@@ -85,4 +88,23 @@ def NewCommandEvents(count=1):
             self.__dict__.update(kw)
 
     return (_Event,) + NewEventTypes(count, 1)
+
+
+class NotifyEvent(wx.PyCommandEvent):
+    """ This class provides a simple notification-like event. """
+
+    def __init__(self, evttype, id, **kw):
+        wx.PyCommandEvent.__init__(self, evttype, id)
+        self.__dict__.update(kw)
+
+        self._allowed = True
+
+    def Allow(self):
+        self._allowed = True
+
+    def Veto(self):
+        self._allowed = False
+
+    def IsAllowed(self):
+        return self._allowed
 

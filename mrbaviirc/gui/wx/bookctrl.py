@@ -12,8 +12,21 @@ import wx
 
 from .button import ScrolledButtonPanel, EVT_SCROLLED_BUTTON_CLICKED
 from .sizer import SingleItemSizer
+from .event import NotifyEvent, NewEventTypes
 
-__all__.append("ScrolledButtonBook")
+# A scrolled button book control
+
+__all__.extend([
+    "ScrolledButtonBook"
+    "SCROLLED_BOOKCTRL_PAGE_CHANGING",
+    "SCROLLED_BOOKCTRL_PAGE_CHANGED"
+])
+
+
+(_evtSCROLLBOOK_PAGE_CHANGING, EVT_SCROLLBOOK_PAGE_CHANGING,
+ _evtSCROLLBOOK_PAGE_CHANGED,  EVT_SCROLLBOOK_PAGE_CHANGED) = NewEventTypes(2)
+
+
 class ScrolledButtonBook(wx.Panel):
 
     def __init__(self, parent, id=wx.ID_ANY, style=wx.LEFT, border=-1, spacing=-1):
@@ -25,6 +38,7 @@ class ScrolledButtonBook(wx.Panel):
         self._dir = style & wx.ALL
         self._border = border
         self._spacing = spacing
+        self._index = wx.NOT_FOUND
         self.InitGUI()
 
     def InitGUI(self):
@@ -67,13 +81,31 @@ class ScrolledButtonBook(wx.Panel):
 
         self.Bind(EVT_SCROLLED_BUTTON_CLICKED, self.OnClick)
 
-    def AddPage(self, window, text, bitmap):
+    def AddPage(self, window, text, bitmap, select=False):
         page = (text, bitmap, window)
         self._pages.append(page)
 
         index = self._buttons.AddButton(wx.ID_ANY, text, bitmap, wx.TOP)
         self._panels.Add(window)
-        self.SetPage(index)
+
+        if select == True or len(self._pages) == 1:
+            self.SetPage(index)
+
+    def ChangePage(self, index):
+        oldpage = self._index
+
+        if oldpage == index:
+            return
+
+        # Page changing event
+        event = wx.BookCtrlEvent(_evtSCROLLBOOK_PAGE_CHANGING, self.GetId(), index, oldpage)
+        self.GetEventHandler().ProcessEvent(event)
+
+        if event.IsAllowed():
+            # Page changed event
+            self.SetPage(index)
+            event = wx.BookCtrlEvent(_evtSCROLLBOOK_PAGE_CHANGED, self.GetId(), index, oldpage)
+            wx.PostEvent(self, event)
 
     def SetPage(self, index):
         if index >= len(self._pages):
@@ -88,12 +120,14 @@ class ScrolledButtonBook(wx.Panel):
         self._text.SetFont(font)
 
         self._text.SetLabel(text)
+        self._index = index
 
         self._panels.SetSelection(window)
         self.Layout()
 
     def OnClick(self, event):
-        self.SetPage(event.GetInt())
+        self.ChangePage(event.GetInt())
+
 
 def main():
     class Frame(wx.Frame):
@@ -138,6 +172,18 @@ def main():
 
             self.SetSizerAndFit(sizer)
             self.SetAutoLayout(1)
+
+            self.Bind(EVT_SCROLLBOOK_PAGE_CHANGING, self.OnChanging)
+            self.Bind(EVT_SCROLLBOOK_PAGE_CHANGED, self.OnChanged)
+
+        def OnChanging(self, event):
+            if wx.MessageBox("Veto the event", "Question", wx.YES_NO) == wx.YES:
+                event.Veto()
+            pass
+
+        def OnChanged(self, event):
+            wx.MessageBox("Page changed from {0} to {1}".format(event.GetOldSelection(), event.GetSelection()))
+
 
 
     class App(wx.App):

@@ -24,21 +24,44 @@ class SingleItemSizer(wx.PySizer):
         wx.PySizer.__init__(self, *args, **kwargs)
         self.__selected_item = None
 
+    def _Added(self, item):
+        if self.GetItemCount() > 1:
+            # Hide all but the first items
+            item.Show(False)
+        else:
+            item.Show(True)
+            self.__selected_item = item
+        return item
+
+    def Add(self, *args, **kwargs):
+        return self._Added(wx.PySizer.Add(self, *args, **kwargs))
+
+    def AddF(self, *args, **kwargs):
+        return self._Added(wx.PySizer.AddF(self, *args, **kwargs))
+
+    def Insert(self, *args, **kwargs):
+        return self._Added(wx.PySizer.Insert(self, *args, **kwargs))
+
+    def InsertF(self, *args, **kwargs):
+        return self._Added(wx.PySizer.InsertF(self, *args, **kwargs))
+
+    def Prepend(self, *args, **kwargs):
+        return self._Added(wx.PySizer.Prepend(self, *args, **kwargs))
+
+    def PrependF(self, *args, **kwargs):
+        return self._Added(wx.PySizer.PrependF(self, *args, **kwargs))
+
     def SetSelection(self, item):
         """ Set the selected item and hide all other items. """
         # Hide all items
         self.ShowItems(False)
-        #for _item in self.GetChildren():
-        #    _item.Show(False)
         
         # Show only the selected item
-        if item is None:
-            self.__selected_item = None
-        else:
+        if not isinstance(item, wx.SizerItem):
             _item = self.GetItem(item)
-            _item.Show(True)
-            self.__selected_item = _item
-            #self.Show(_item.GetWindow())
+        self.__selected_item = _item
+
+        item.Show(True)
             
     def GetSelection(self):
         """ Return the wx.SizerItem of the selected item. """
