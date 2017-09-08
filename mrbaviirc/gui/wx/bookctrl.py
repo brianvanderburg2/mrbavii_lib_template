@@ -39,9 +39,9 @@ class ScrolledButtonBook(wx.Panel):
         self._border = border
         self._spacing = spacing
         self._index = wx.NOT_FOUND
-        self.InitGUI()
+        self.InitGui()
 
-    def InitGUI(self):
+    def InitGui(self):
         # On the left is the scrolled button window.  On the right
         # is split.  Top is an icon and a page text, bottom is the
         # contents of the control.
