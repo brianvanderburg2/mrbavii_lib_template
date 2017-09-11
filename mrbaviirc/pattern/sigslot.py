@@ -1,15 +1,16 @@
 """ Provide a very basic signals-and-slots feature. """
 
 __author__      = "Brian Allen Vanderburg II"
-__copyright__   = "Copyright 2016"
+__copyright__   = "Copyright (C) 2016-2017 Brian Allen Vanderburg II"
 __license__     = "Apache License 2.0"
 
+__all__ = []
 
 import weakref
 
 
-# A slot for a strong reference
 class _Slot(object):
+    """ A strongly-referenced slot. """
     def __init__(self, fn):
         self.__fn = fn
 
@@ -21,9 +22,10 @@ class _Slot(object):
         return id(self)
 
 
-# A slot for a weak reference connection, one that will automatically
-# disconnect when the target is gone.
 class _WeakSlot(object):
+    """ A slot for a weak reference connection, one that will automatically
+        disconnect when the target is gone """
+
     def __init__(self, signal, fn):
         self.__signal = weakref.ref(signal)
         if hasattr(fn, 'im_self'):
@@ -63,7 +65,7 @@ class _WeakSlot(object):
         return id(self)
 
 
-# The signal object
+__all__.append("Signal")
 class Signal(object):
     """A signal that can connect to and call slots.
     """
@@ -133,12 +135,12 @@ class Signal(object):
         not exist, it will not be disconnected.
         """
 
-        for i in xrange(len(self.__slots)):
+        for i in range(len(self.__slots)):
             if self.__slots[i].getid() == id:
                 del self.__slots[i]
                 break
 
-    def disconnectAll(self):
+    def disconnect_all(self):
         """Disconnect all slots.
         """
 
@@ -155,7 +157,7 @@ class Signal(object):
         """
 
         combiner = self.Combiner()
-        for i in xrange(len(self.__slots)):
+        for i in range(len(self.__slots)):
             (called, result) = self.__slots[i].execute(*args, **kwargs)
             if called and combiner.combine(result) == False:
                 break
