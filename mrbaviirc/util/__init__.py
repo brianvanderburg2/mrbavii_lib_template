@@ -5,6 +5,19 @@ __copyright__   =   "Copyright (C) 2017 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
 
+def updatedoc(prepend, append):
+    """ A decorator to prepend or append to an object's doc string. """
+    def wrapper(obj):
+        obj.__doc__ = "{0}{1}{2}".format(
+            prepend if prepend else "",
+            obj.__doc__ if obj.__doc__ else "",
+            append if append else ""
+        )
+        return obj
+
+    return wrapper
+
+
 def updateall(item_or_name):
     """
         Update the __all__ list of the calling module with the function or class name. 
