@@ -6,6 +6,7 @@ __license__     =   "Apache License 2.0"
 
 __all__ = []
 
+import os
 import contextlib
 
 from ..util import updatedoc
