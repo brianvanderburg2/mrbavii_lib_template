@@ -1,3 +1,3 @@
 # Import version information
-from _version import *
+from ._version import *
 
