@@ -38,6 +38,11 @@ def _detect_platform_path(portable=False):
 path = _detect_platform_path()
 
 
+# Some common functions a
+
+
+
+
 class Path(object):
     
     def __init__(self, appname, version=None, portable=False):
@@ -62,15 +67,11 @@ class Path(object):
         )
 
     def get_package_data_dir(self, package, all=True):
-        """ Get the package data directory.  This assumes data installed with the
-            package in a subdirectory called 'data'. """
-
-        p = os.path
-
-        paths = getattr(package, "__path__")
-        dirs = tuple(p.abspath(p.join(part, "data")) for part in paths)
-
-        return dirs if all else dirs[0]
+        """ Get the package data directory. """
+        return self._path.get_package_data_dir(
+            package,
+            all
+        )
 
     def get_user_config_dir(self, version=True):
         return self._path.get_user_config_dir(

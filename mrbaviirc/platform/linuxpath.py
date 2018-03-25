@@ -8,6 +8,9 @@ __license__     =   "Apache License 2.0"
 import os
 
 
+from .commonpath import *
+
+
 def get_user_data_dir(appname, version=None):
     """ Return the directory to read/write user data files. """
     datadir = os.path.join(
