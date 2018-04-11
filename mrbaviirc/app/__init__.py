@@ -26,8 +26,8 @@ class Traits(object):
         return self._path
         
 
-class App(object):
-    """ The application oject. """
+class AppHelper(object):
+    """ The application helper oject. """
 
     # Some common properties that should be defined if needed
 
