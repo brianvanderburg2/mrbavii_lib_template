@@ -5,6 +5,9 @@ __copyright__   =   "Copyright (C) 2018 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
 
+import argparse
+
+
 from .. import platform
 
 
@@ -60,9 +63,12 @@ class AppHelper(object):
         return self._traits
 
     @property
-    def cmdline(self):
-        """ Return the command line. """
-        return self._cmdline
+    def args(self):
+        """ Return the command line. arguments. """
+        if self._args is None:
+            self._args = self.parse_args()
+
+        return self._args
 
     @property
     def path(self):
@@ -71,9 +77,22 @@ class AppHelper(object):
             self._path = self.traits.path
 
     def __init__(self):
-        self._cmdline = None
+        self._args = None
         self._traits = None
         self._path = None
+
+    def create_arg_parser(self):
+        """ Create and return the command line argument parser. """
+        import argparse
+
+        return ArgumentParser(description=self.description)
+
+    def parse_args(self):
+        """ Parse the command line arguments. """
+        parser = self.create_arg_parser()
+
+        return parser.parse_args()
+
 
     def execute(self):
         self.startup()
@@ -91,4 +110,35 @@ class AppHelper(object):
         raise NotImplementedError
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    """ A helper class for parsing arguments. """
 
+    def __init__(self, *args, **kwargs):
+        """ Initialize argument parser. """
+
+        self.__remainder = None
+        self.__remainder_added = False
+
+        argparse.ArgumentParser.__init__(self, *args, **kwargs)
+
+    def add_remainder(self, remainder):
+        """ Add an argument to accept the remainder of the parameters. """
+        self.__remainder = remainder
+
+    def parse_args(self, *args, **kwargs):
+        """ Parse the arguments. """
+
+        if not self.__remainder_added:
+            if self.__remainder:
+                self.add_argument(self.__remainder, nargs=argparse.REMAINDER)
+            self.__remainder_added = True
+
+        args = argparse.ArgumentParser.parse_args(self, *args, **kwargs)
+
+        if self.__remainder:
+            # If the remainder started with "--", pop it off
+            remainder = getattr(args, self.__remainder, [])
+            if len(remainder) and remainder[0] == "--":
+                setattr(args, self.__remainder, remainder[1:])
+
+        return args
