@@ -1,5 +1,7 @@
 """ Application helper functions and classes. """
 
+from __future__ import absolute_import
+
 __author__      =   "Brian Allen Vanderburg II"
 __copyright__   =   "Copyright (C) 2018 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
@@ -8,10 +10,75 @@ __license__     =   "Apache License 2.0"
 import argparse
 
 
+from ..util.imp import export
 from .. import platform
 
 
-class Traits(object):
+@export
+class AppPath(object):
+    """ An application path aobject. """
+    def __init__(self, appname, version=None):
+        self._appname = appname
+        self._version = version
+
+        self._tempdir = None
+
+        self._path = platform.path
+
+    def get_user_data_dir(self, version=True):
+        return self._path.get_user_data_dir(
+            self._appname,
+            self._version if version else None
+        )
+
+    def get_sys_data_dir(self, version=True, all=True):
+        return self._path.get_sys_data_dir(
+            self._appname,
+            self._version if version else None,
+            all
+        )
+
+    def get_package_data_dir(self, package, all=True):
+        """ Get the package data directory. """
+        return self._path.get_package_data_dir(
+            package,
+            all
+        )
+
+    def get_user_config_dir(self, version=True):
+        return self._path.get_user_config_dir(
+            self._appname,
+            self._version if version else None
+        )
+
+    def get_sys_config_dir(self, version=True, all=True):
+        return self._path.get_sys_config_dir(
+            self._appname,
+            self._version if version else None,
+            all
+        )
+
+    def get_cache_dir(self, version=True):
+        return self._path.get_cache_dir(
+            self._appname,
+            self._version if version else None
+        )
+
+    def get_runtime_dir(self, version=True):
+        return self._path.get_runtime_dir(
+            self._appname,
+            self._version if version else None
+        )
+
+    def get_temp_dir(self, newdir=False):
+        if self._tempdir is None or newdir or not os.path.isdir(self._tempdir):
+            self._tempdir =  self._path.get_temp_dir()
+
+        return self._tempdir
+
+
+@export
+class AppTraits(object):
     """ The traits of an application. """
 
     def __init__(self, app):
@@ -21,7 +88,7 @@ class Traits(object):
     @property
     def path(self):
         if self._path is None:
-            self._path = platform.Path(
+            self._path = AppPath(
                 self._app.appname,
                 self._app.appversion
             )
@@ -29,6 +96,7 @@ class Traits(object):
         return self._path
         
 
+@export
 class AppHelper(object):
     """ The application helper oject. """
 
@@ -58,7 +126,7 @@ class AppHelper(object):
     def traits(self):
         """ Get the app traits. """
         if self._traits is None:
-            self._traits = Traits(self)
+            self._traits = AppTraits(self)
 
         return self._traits
 
@@ -77,15 +145,16 @@ class AppHelper(object):
             self._path = self.traits.path
 
     def __init__(self):
+        """ Initialize base apps object. """
         self._args = None
         self._traits = None
         self._path = None
 
     def create_arg_parser(self):
         """ Create and return the command line argument parser. """
-        import argparse
+        parser = ArgumentParser(description=self.description)
 
-        return ArgumentParser(description=self.description)
+        return parser
 
     def parse_args(self):
         """ Parse the command line arguments. """
@@ -110,6 +179,7 @@ class AppHelper(object):
         raise NotImplementedError
 
 
+@export
 class ArgumentParser(argparse.ArgumentParser):
     """ A helper class for parsing arguments. """
 
