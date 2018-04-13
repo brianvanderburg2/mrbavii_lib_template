@@ -14,17 +14,48 @@ import types
 
 
 __all__.append("export")
-def export(obj):
+def export(_obj=None, **kwargs):
     """ Export the given object by appending it's name to the modules __all__"""
 
-    mod = sys.modules[obj.__module__]
-    if hasattr(mod, "__all__"):
-        if not obj.__name__ in mod.__all__:
-            mod.__all__.append(obj.__name__)
-    else:
-        mod.__all__ = [obj.__name__]
+    mdict = (
+        sys.modules[_obj.__module__].__dict__
+        if _obj
+        else sys._getframe(1).f_globals
+    )
+    mall = mdict.setdefault("__all__", [])
 
-    return obj
+    if not _obj is None:
+        if not _obj.__name__ in mall:
+            mall.append(_obj.__name__)
+
+    for name in kwargs:
+        if not name in mall:
+            mall.append(name)
+        mdict[name] = kwargs[name]
+
+    return _obj
+
+@export
+def export_import_all(module):
+    """ Perform a 'from <module> import *' and export all imported symbols. """
+    mdict = sys._getframe(1).f_globals
+    mall = mdict.setdefault("__all__", [])
+    mpackage = mdict.get("__package__")
+
+    impdict = importlib.import_module(module, mpackage).__dict__
+    impnames = [
+        name
+        for name in impdict.get("__all__", impdict)
+        if not name.startswith("_")
+    ]
+
+    for impname in impnames:
+        if not impname in mall:
+            mall.append(impname)
+        mdict[impname] = impdict[impname]
+
+
+
 
 @export
 def import_submodules(package_name, recursive=False):
