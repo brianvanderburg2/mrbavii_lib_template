@@ -144,6 +144,8 @@ class AppHelper(object):
         if not self._path:
             self._path = self.traits.path
 
+        return self._path
+
     def __init__(self):
         """ Initialize base apps object. """
         self._args = None
