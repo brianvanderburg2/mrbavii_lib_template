@@ -83,17 +83,27 @@ class AppPath(object):
         return self._tempdir
 
 
+class _BaseRef(object):
+    """ A base class for references used in App config/service registry. """
+
+    def resolve(self, helper, args, kwargs):
+        raise NotImplementedError
+
+
 @export
-class ConfigRef(object):
+class ConfigRef(_BaseRef):
     """ Reference a configuration item. """
 
     def __init__(self, name, defval=_SENTINEL):
         self.name = name
         self.defval = defval
 
+    def resolve(self, helper, args, kwargs):
+        return helper.getconfig(self.name, self.defval, args, kwargs)
+
 
 @export
-class ServiceRef(object):
+class ServiceRef(_BaseRef):
     """ Reference a service item. """
 
     def __init__(self, name, *args, **kwargs):
@@ -101,34 +111,55 @@ class ServiceRef(object):
         self.args = args
         self.kwargs = kwargs
 
+    def resolve(self, helper, args, kwargs):
+        newargs = helper.evalconfig(self.args, args, kwargs)
+        newkwargs = helper.evalconfig(self.kwargs, args, kwargs)
+        return helper.resolve(self.name, newargs, newkwargs)
+
+
 @export
-class FuncRef(object):
+class FuncRef(_BaseRef):
     """ Evaluate a function to determine a value. """
 
     def __init__(self, func):
         self.func = func
 
+    def resolve(self, helper, args, kwargs):
+        return helper.evalconfig(self.func(), args, kwargs)
+
+
 @export
-class StorageRef(object):
+class StorageRef(_BaseRef):
     """ Return a value from storage. """
 
     def __init__(self, name, defval=_SENTINEL):
         self.name = name
         self.defval = defval
 
+    def resolve(self, helper, args, kwargs):
+        return helper.recall(self.name, self.defval)
+
+
 @export
-class PosRef(object):
+class PosRef(_BaseRef):
     """ Represent a positional argument to resolve. """
 
     def __init__(self, pos):
         self.pos = pos
 
+    def resolve(self, helper, args, kwargs):
+        return args[self.pos]
+
+
 @export
-class KeyRef(object):
+class KeyRef(_BaseRef):
     """ Represent a keyword argument to resolve. """
 
     def __init__(self, key):
         self.key = key
+
+    def resolve(self, helper, args, kwargs):
+        return kwargs(self.key)
 
 
 @export
@@ -195,20 +226,20 @@ class AppHelper(object):
         if not name in self._registry:
             raise KeyError("No such service: {0}".format(str(name)))
 
-        (factory, regargs, regkwargs, single) = self._registry[name]
+        (regfactory, regargs, regkwargs, single) = self._registry[name]
 
         if single and name in self._services:
             return self._services[name]
 
-        if isinstance(factory, str):
-            factory = self._getconfig(factory, args, kwargs)
+        if isinstance(regfactory, (str, _BaseRef)):
+            regfactory = self.evalconfig(regfactory, args, kwargs)
 
         # Merge our args
-        factory_args = self._getconfig(regargs, args, kwargs)
-        factory_kwargs = self._getconfig(regkwargs, args, kwargs)
+        factory_args = self.evalconfig(regargs, args, kwargs)
+        factory_kwargs = self.evalconfig(regkwargs, args, kwargs)
 
         # Create the result
-        result = factory(*factory_args, **factory_kwargs)
+        result = regfactory(*factory_args, **factory_kwargs)
         if single:
             self._services[name] = result
 
@@ -217,35 +248,23 @@ class AppHelper(object):
     def getconfig(self, config, defval=_SENTINEL, args=(), kwargs={}):
         """ Get the value of a config. """
         if config in self._configs:
-            return self._getconfig(self._configs[config], args, kwargs)
+            return self.evalconfig(self._configs[config], args, kwargs)
         elif defval is not _SENTNEL:
-            return self._getconfig(defval, args, kwargs)
+            return self.evalconfig(defval, args, kwargs)
         else:
             raise KeyError("No such config: {0}".format(config))
 
-    def _getconfig(self, what, args, kwargs):
+    def evalconfig(self, what, args=(), kwargs={}):
         """ Recursively resolve a configuration. """
 
         if isinstance(what, tuple):
-            return tuple(self._getconfig(i, args, kwargs) for i in what)
+            return tuple(self.evalconfig(i, args, kwargs) for i in what)
         elif isinstance(what, list):
-            return list(self._getconfig(i, args, kwargs) for i in what)
+            return list(self.evalconfig(i, args, kwargs) for i in what)
         elif isinstance(what, dict):
-            return {i: self._getconfig(what[i], args, kwargs) for i in what}
-        elif isinstance(what, ConfigRef):
-            return self.getconfig(what.name, what.defval, args, kwargs)
-        elif isinstance(what, ServiceRef):
-            newargs = self._getconfig(what.args, args, kwargs)
-            newkwargs = self._getconfig(what.kwargs, args, kwargs)
-            return self.resolve(what.name, *newargs, **newkwargs)
-        elif isinstance(what, FuncRef):
-            return self._getconfig(what.func(), args, kwargs)
-        elif isinstance(what, StorageRef):
-            return self.recall(what.name, what.defval)
-        elif isinstance(what, PosRef):
-            return args[what.pos]
-        elif isinstance(what, KeyRef):
-            return kwargs[what.key]
+            return {i: self.evalconfig(what[i], args, kwargs) for i in what}
+        elif isinstance(what, _BaseRef):
+            return what.resolve(self, args, kwargs)
         else:
             return what
 
