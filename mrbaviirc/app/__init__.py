@@ -116,6 +116,20 @@ class StorageRef(object):
         self.name = name
         self.defval = defval
 
+@export
+class PosRef(object):
+    """ Represent a positional argument to resolve. """
+
+    def __init__(self, pos):
+        self.pos = pos
+
+@export
+class KeyRef(object):
+    """ Represent a keyword argument to resolve. """
+
+    def __init__(self, key):
+        self.key = key
+
 
 @export
 class AppHelper(object):
@@ -179,59 +193,59 @@ class AppHelper(object):
     def resolve(self, name, *args, **kwargs):
         """ Resolve a given service. """
         if not name in self._registry:
-            return
+            raise KeyError("No such service: {0}".format(str(name)))
 
-        (factory, _args, _kwargs, single) = self._registry[name]
+        (factory, regargs, regkwargs, single) = self._registry[name]
 
         if single and name in self._services:
             return self._services[name]
 
         if isinstance(factory, str):
-            factory = self._getconfig(factory)
+            factory = self._getconfig(factory, args, kwargs)
 
         # Merge our args
-        newargs = list(_args)
-        newargs[0:len(args)] = args
-
-        newkwargs = dict(_kwargs)
-        newkwargs.update(kwargs)
-
-        newargs = self._getconfig(newargs)
-        newkwargs = self._getconfig(newkwargs)
+        factory_args = self._getconfig(regargs, args, kwargs)
+        factory_kwargs = self._getconfig(regkwargs, args, kwargs)
 
         # Create the result
-        result = factory(*newargs, **newkwargs)
+        result = factory(*factory_args, **factory_kwargs)
         if single:
             self._services[name] = result
 
         return result
 
-    def getconfig(self, config, defval=_SENTINEL):
+    def getconfig(self, config, defval=_SENTINEL, args=(), kwargs={}):
         """ Get the value of a config. """
         if config in self._configs:
-            return self._getconfig(self._configs[config])
+            return self._getconfig(self._configs[config], args, kwargs)
         elif defval is not _SENTNEL:
-            return self._getconfig(defval)
+            return self._getconfig(defval, args, kwargs)
         else:
             raise KeyError("No such config: {0}".format(config))
 
-    def _getconfig(self, what):
+    def _getconfig(self, what, args, kwargs):
         """ Recursively resolve a configuration. """
 
         if isinstance(what, tuple):
-            return tuple(self._getconfig(i) for i in what)
+            return tuple(self._getconfig(i, args, kwargs) for i in what)
         elif isinstance(what, list):
-            return list(self._getconfig(i) for i in what)
+            return list(self._getconfig(i, args, kwargs) for i in what)
         elif isinstance(what, dict):
-            return {i: self._getconfig(i) for i in what}
+            return {i: self._getconfig(what[i], args, kwargs) for i in what}
         elif isinstance(what, ConfigRef):
-            return self.getconfig(what.name, what.defval)
+            return self.getconfig(what.name, what.defval, args, kwargs)
         elif isinstance(what, ServiceRef):
-            return self.resolve(what.name, *what.args, **what.kwargs)
+            newargs = self._getconfig(what.args, args, kwargs)
+            newkwargs = self._getconfig(what.kwargs, args, kwargs)
+            return self.resolve(what.name, *newargs, **newkwargs)
         elif isinstance(what, FuncRef):
-            return self._getconfig(what.func())
+            return self._getconfig(what.func(), args, kwargs)
         elif isinstance(what, StorageRef):
             return self.recall(what.name, what.defval)
+        elif isinstance(what, PosRef):
+            return args[what.pos]
+        elif isinstance(what, KeyRef):
+            return kwargs[what.key]
         else:
             return what
 
