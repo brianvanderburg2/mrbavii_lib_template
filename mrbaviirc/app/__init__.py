@@ -15,6 +15,11 @@ from ..util.imp import export
 from ..util.functools import lazyprop
 from ..pattern.event import Events
 
+
+# Use for comparing some values
+_SENTINEL = object()
+
+
 @export
 class AppPath(object):
     """ An application path aobject. """
@@ -82,7 +87,7 @@ class AppPath(object):
 class ConfigRef(object):
     """ Reference a configuration item. """
 
-    def __init__(self, name, defval=None):
+    def __init__(self, name, defval=_SENTINEL):
         self.name = name
         self.defval = defval
 
@@ -95,6 +100,21 @@ class ServiceRef(object):
         self.name = name
         self.args = args
         self.kwargs = kwargs
+
+@export
+class FuncRef(object):
+    """ Evaluate a function to determine a value. """
+
+    def __init__(self, func):
+        self.func = func
+
+@export
+class StorageRef(object):
+    """ Return a value from storage. """
+
+    def __init__(self, name, defval=_SENTINEL):
+        self.name = name
+        self.defval = defval
 
 
 @export
@@ -127,18 +147,30 @@ class AppHelper(object):
         self._configs = {}
         self._registry = {}
         self._services = {}
+        self._storage = {}
 
         self.setup()
 
     def setup(self):
         """ Setup configs and registry here. """
-        pass
+
+        self.config("appname", FuncRef(lambda: self.appname))
+        self.config("appversion", FuncRef(lambda: self.appversion))
+
+        self.register(
+            "path",
+            AppPath,
+            (
+                ConfigRef("appname"),
+                ConfigRef("appversion")
+            )
+        )
 
     # Service/config registry
 
-    def config(self, data):
+    def config(self, name, value):
         """ Update our configurations. """
-        self._configs.update(data)
+        self._configs[name] = value
 
     def register(self, name, factory, args=(), kwargs={}, single=True):
         """ Registry a given service. """
@@ -174,6 +206,15 @@ class AppHelper(object):
 
         return result
 
+    def getconfig(self, config, defval=_SENTINEL):
+        """ Get the value of a config. """
+        if config in self._configs:
+            return self._getconfig(self._configs[config])
+        elif defval is not _SENTNEL:
+            return self._getconfig(defval)
+        else:
+            raise KeyError("No such config: {0}".format(config))
+
     def _getconfig(self, what):
         """ Recursively resolve a configuration. """
 
@@ -184,13 +225,13 @@ class AppHelper(object):
         elif isinstance(what, dict):
             return {i: self._getconfig(i) for i in what}
         elif isinstance(what, ConfigRef):
-            if what.name in self._configs:
-                value = self._configs[what.name]
-            else:
-                value = what.default
-            return self._getconfig(value)
+            return self.getconfig(what.name, what.defval)
         elif isinstance(what, ServiceRef):
             return self.resolve(what.name, *what.args, **what.kwargs)
+        elif isinstance(what, FuncRef):
+            return self._getconfig(what.func())
+        elif isinstance(what, StorageRef):
+            return self.recall(what.name, what.defval)
         else:
             return what
 
@@ -205,6 +246,18 @@ class AppHelper(object):
     def ignore(self, cbid):
         self.event.remove(cbid)
 
+    # Value storage
+    def remember(self, name, value):
+        self._storage[name] = value
+
+    def recall(self, name, defval=_SENTINEL):
+        if defval is _SENTINEL:
+            return self._storage.get(name)
+        else:
+            return self._storage.get(name, defval)
+
+    def forget(self, name):
+        self._storage.pop(name, None)
 
     # Some common properties that should be defined if needed
 
@@ -233,10 +286,10 @@ class AppHelper(object):
         """ Return the command line. arguments. """
         return self.parse_args()
 
-    @lazyprop
+    @property
     def path(self):
         """ Return the application paths."""
-        return AppPath(self.appname, self.appversion)
+        return self.resolve("path")
 
     @lazyprop
     def event(self):
