@@ -1,5 +1,7 @@
 """ Provide some function and method utilities """
 
+from __future__ import absolute_import
+
 __author__      =   "Brian Allen Vanderburg II"
 __copyright__   =   "Copyright (C) 2016-2017 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
@@ -8,6 +10,31 @@ __all__ = []
 
 
 import weakref
+from functools import wraps
+
+
+__all__.append("lazyprop")
+def lazyprop(method):
+    """ Create a read-only lazy property that is evaulated once and remembered. """
+
+    name = method.__name__
+    if name.startswith("__") and not name.endswith("__"):
+        name = "_{0}{1}".format(method.__class__.__name__, name)
+
+    name = "_lazy_{0}".format(name)
+
+    @property
+    @wraps(method)
+    def wrapper(self):
+        if hasattr(self, name):
+            result = getattr(self, name)
+        else:
+            result = method(self)
+            setattr(self, name, result)
+
+        return result
+
+    return wrapper
 
 
 __all__.append("WeakCallback")

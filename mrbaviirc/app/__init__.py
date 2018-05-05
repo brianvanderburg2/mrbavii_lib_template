@@ -10,9 +10,10 @@ __license__     =   "Apache License 2.0"
 import argparse
 
 
-from ..util.imp import export
 from .. import platform
-
+from ..util.imp import export
+from ..util.functools import lazyprop
+from ..pattern.event import Events
 
 @export
 class AppPath(object):
@@ -78,27 +79,132 @@ class AppPath(object):
 
 
 @export
-class AppTraits(object):
-    """ The traits of an application. """
+class ConfigRef(object):
+    """ Reference a configuration item. """
 
-    def __init__(self, app):
-        self._app = app
-        self._path = None
+    def __init__(self, name, defval=None):
+        self.name = name
+        self.defval = defval
 
-    @property
-    def path(self):
-        if self._path is None:
-            self._path = AppPath(
-                self._app.appname,
-                self._app.appversion
-            )
 
-        return self._path
-        
+@export
+class ServiceRef(object):
+    """ Reference a service item. """
+
+    def __init__(self, name, *args, **kwargs):
+        self.name = name
+        self.args = args
+        self.kwargs = kwargs
+
 
 @export
 class AppHelper(object):
     """ The application helper oject. """
+
+    # Provide access to the global instance as well as named instances
+    __instances = {}
+
+    @classmethod
+    def get(cls, name=None):
+        """ Return the instance of the app helper. """
+        return cls.__instances.get(name, None)
+
+    @classmethod
+    def set(cls, instance, name=None):
+        """ Set the instance of the app helper. """
+        cur = cls.__instances.get(name, None)
+        cls.__instances[name] = instance
+        return cur
+
+    # Initialization
+
+    def __init__(self):
+        """ Initialize.  Note the construction shouldn't perform any active
+            opterations, it's really just a place to specify configurations.
+        """
+        self.set(self) # Set as the global instance
+
+        self._configs = {}
+        self._registry = {}
+        self._services = {}
+
+        self.setup()
+
+    def setup(self):
+        """ Setup configs and registry here. """
+        pass
+
+    # Service/config registry
+
+    def config(self, data):
+        """ Update our configurations. """
+        self._configs.update(data)
+
+    def register(self, name, factory, args=(), kwargs={}, single=True):
+        """ Registry a given service. """
+        self._registry[name] = (factory, args, kwargs, single)
+
+    def resolve(self, name, *args, **kwargs):
+        """ Resolve a given service. """
+        if not name in self._registry:
+            return
+
+        (factory, _args, _kwargs, single) = self._registry[name]
+
+        if single and name in self._services:
+            return self._services[name]
+
+        if isinstance(factory, str):
+            factory = self._getconfig(factory)
+
+        # Merge our args
+        newargs = list(_args)
+        newargs[0:len(args)] = args
+
+        newkwargs = dict(_kwargs)
+        newkwargs.update(kwargs)
+
+        newargs = self._getconfig(newargs)
+        newkwargs = self._getconfig(newkwargs)
+
+        # Create the result
+        result = factory(*newargs, **newkwargs)
+        if single:
+            self._services[name] = result
+
+        return result
+
+    def _getconfig(self, what):
+        """ Recursively resolve a configuration. """
+
+        if isinstance(what, tuple):
+            return tuple(self._getconfig(i) for i in what)
+        elif isinstance(what, list):
+            return list(self._getconfig(i) for i in what)
+        elif isinstance(what, dict):
+            return {i: self._getconfig(i) for i in what}
+        elif isinstance(what, ConfigRef):
+            if what.name in self._configs:
+                value = self._configs[what.name]
+            else:
+                value = what.default
+            return self._getconfig(value)
+        elif isinstance(what, ServiceRef):
+            return self.resolve(what.name, *what.args, **what.kwargs)
+        else:
+            return what
+
+
+    # Event listeners
+    def listen(self, event, callback):
+        return self.event.listen(event, callback)
+
+    def notify(self, event, *args, **kwargs):
+        self.event.fire(event, *args, **kwargs)
+
+    def ignore(self, cbid):
+        self.event.remove(cbid)
+
 
     # Some common properties that should be defined if needed
 
@@ -122,35 +228,21 @@ class AppHelper(object):
         """ Return the application description. """
         return self.displayname
 
-    @property
-    def traits(self):
-        """ Get the app traits. """
-        if self._traits is None:
-            self._traits = AppTraits(self)
-
-        return self._traits
-
-    @property
+    @lazyprop
     def args(self):
         """ Return the command line. arguments. """
-        if self._args is None:
-            self._args = self.parse_args()
+        return self.parse_args()
 
-        return self._args
-
-    @property
+    @lazyprop
     def path(self):
         """ Return the application paths."""
-        if not self._path:
-            self._path = self.traits.path
+        return AppPath(self.appname, self.appversion)
 
-        return self._path
+    @lazyprop
+    def event(self):
+        """ Return events object. """
+        return Events()
 
-    def __init__(self):
-        """ Initialize base apps object. """
-        self._args = None
-        self._traits = None
-        self._path = None
 
     def create_arg_parser(self):
         """ Create and return the command line argument parser. """
@@ -164,20 +256,25 @@ class AppHelper(object):
 
         return parser.parse_args()
 
+    # Execution related methods. """
 
     def execute(self):
+        """ External method to execute the application. """
         self.startup()
         self.main()
         self.shutdown()
 
     def startup(self):
+        """ Perform startup here. """
         pass
 
     def shutdown(self):
+        """ Perform shutdown here. """
         pass
 
 
     def main(self):
+        """ Run application main code here. """
         raise NotImplementedError
 
 
