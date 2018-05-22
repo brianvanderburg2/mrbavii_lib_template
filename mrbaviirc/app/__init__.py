@@ -161,6 +161,16 @@ class KeyRef(_BaseRef):
     def resolve(self, helper, args, kwargs):
         return kwargs(self.key)
 
+@export
+class AppRef(_BaseRef):
+    """ Represent the current apphelper instance. """
+
+    def __init__(self):
+        pass
+
+    def resolve(self, helper, args, kwargs):
+        return helper
+
 
 @export
 class AppHelper(object):
@@ -234,7 +244,7 @@ class AppHelper(object):
         if isinstance(regfactory, (str, _BaseRef)):
             regfactory = self.evalconfig(regfactory, args, kwargs)
 
-        # Merge our args
+        # Get our args
         factory_args = self.evalconfig(regargs, args, kwargs)
         factory_kwargs = self.evalconfig(regkwargs, args, kwargs)
 
