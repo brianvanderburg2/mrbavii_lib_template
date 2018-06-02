@@ -1,4 +1,4 @@
-""" Application helper functions and classes. """
+""" Common constants. """
 
 from __future__ import absolute_import
 
@@ -7,11 +7,12 @@ __copyright__   =   "Copyright (C) 2018 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
 
-from ..util.imp import Exporter
+__all__ = []
 
-export = Exporter(globals())
+# Use for comparing if a value was passed or not.
+__all__.append("SENTINEL")
+SENTINEL = object()
 
-export.extend(".base")
-export.extend(".argparse")
-export.extend(".path")
+
+
 
