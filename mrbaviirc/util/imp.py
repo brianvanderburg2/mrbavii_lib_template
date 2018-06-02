@@ -5,59 +5,75 @@ __copyright__   =   "Copyright (C) 2018 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
 
-__all__ = []
-
 import sys
 import pkgutil
 import importlib
 import types
 
 
-__all__.append("export")
-def export(_obj=None, **kwargs):
-    """ Export the given object by appending it's name to the modules __all__"""
-
-    mdict = (
-        sys.modules[_obj.__module__].__dict__
-        if _obj
-        else sys._getframe(1).f_globals
-    )
-    mall = mdict.setdefault("__all__", [])
-
-    if not _obj is None:
-        if not _obj.__name__ in mall:
-            mall.append(_obj.__name__)
-
-    for name in kwargs:
-        if not name in mall:
-            mall.append(name)
-        mdict[name] = kwargs[name]
-
-    return _obj
-
-@export
-def export_import_all(module):
-    """ Perform a 'from <module> import *' and export all imported symbols. """
-    mdict = sys._getframe(1).f_globals
-    mall = mdict.setdefault("__all__", [])
-    mpackage = mdict.get("__package__")
-
-    impdict = importlib.import_module(module, mpackage).__dict__
-    impnames = [
-        name
-        for name in impdict.get("__all__", impdict)
-        if not name.startswith("_")
-    ]
-
-    for impname in impnames:
-        if not impname in mall:
-            mall.append(impname)
-        mdict[impname] = impdict[impname]
+class ExportException(Exception):
+    """ An exception caused when using export. """
+    pass
 
 
+class Exporter(object):
+    """ A helper class for exporting names from a module. """
+
+    def __init__(self, _globals):
+        """ Initialize the exporter. """
+        self._all = _globals.setdefault("__all__", [])
+        self._globals = _globals
+        self._package = _globals["__package__"]
 
 
-@export
+    def __call__(self, _obj=None, **kwargs):
+        """ Add to the all list. """
+        if _obj is not None:
+            name = _obj.__name__
+            if name in self._all:
+                raise ExportError("name already exists in __all__: {}".format(name))
+
+            self._all.append(name)
+
+        for name in kwargs:
+            if name in self._all:
+                raise ExportError("name already exists in __all__: {}".format(name))
+            self._all.append(name)
+            self._globals[name] = kwargs[name]
+
+        return _obj
+
+    def extend(self, *modules):
+        """ Extend the all list from other modules. """
+        for module in modules:
+            if isinstance(module, str):
+                module = importlib.import_module(module, self._package)
+
+            mname = module.__name__
+            mdict = module.__dict__
+
+            impnames = [
+                name
+                for name in mdict.get("__all__", mdict)
+                if not name.startswith("_")
+            ]
+
+            for impname in impnames:
+                if impname in self._all:
+                    raise ExportError("name imported from {} already exists in __all__: {}".format(mname, impname))
+                self._all.append(impname)
+                self._globals[impname] = mdict[impname]
+
+
+# Use our exporter from here out.  Call it _export to prevent accidental
+# from imp import export
+_export = Exporter(globals())
+_export(Exporter)
+_export(ExportException)
+
+
+
+@_export
 def import_submodules(package_name, recursive=False):
     """ Import submodules and return a dictionary of name:module """
 
@@ -69,7 +85,7 @@ def import_submodules(package_name, recursive=False):
         for (loader, name, ispkg) in func(package.__path__)
     }
 
-@export
+@_export
 def import_submodules_symbols(package_name, symbol, recursive=False):
     """ Return a list of the specified symbols from all loaded modules. """
     submodules = import_submodules(package_name, recursive)
@@ -82,7 +98,7 @@ def import_submodules_symbols(package_name, symbol, recursive=False):
 
     return results
 
-@export
+@_export
 def import_submodules_symbolref(package_name, symbol, recursive=False):
     """ For each submodule, return a list containing the objects referred
         to by a given symbol.  If the symbol's value is not a list form, it
