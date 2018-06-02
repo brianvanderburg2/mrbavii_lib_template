@@ -5,7 +5,11 @@ __copyright__   =   "Copyright (C) 2018 Brian Allen Vanderburg II"
 __license__     =   "Apache License 2.0"
 
 
-from .imp import export
+from .imp import Exporter
+
+
+export = Exporter(globals())
+
 
 @export
 def dedent(text):

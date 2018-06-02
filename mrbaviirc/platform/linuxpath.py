@@ -12,8 +12,11 @@ __all__ = []
 import os
 
 
-from ..util.imp import export
 from .commonpath import CommonPaths
+from ..util.imp import Exporter
+
+
+export = Exporter(globals())
 
 
 @export

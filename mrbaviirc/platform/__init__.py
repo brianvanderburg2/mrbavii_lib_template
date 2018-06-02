@@ -13,7 +13,8 @@ import sys
 import os
 
 
-from ..util.imp import export
+from ..util.imp import Exporter
+export = Exporter(globals())
 
 
 # Path

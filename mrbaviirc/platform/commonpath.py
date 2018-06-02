@@ -10,7 +10,8 @@ __license__     =   "Apache License 2.0"
 import os
 
 
-from ..util.imp import export
+from ..util.imp import Exporter
+export = Exporter(globals())
 
 
 @export
