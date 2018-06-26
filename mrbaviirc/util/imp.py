@@ -11,7 +11,7 @@ import importlib
 import types
 
 
-class ExportException(Exception):
+class ExportError(Exception):
     """ An exception caused when using export. """
     pass
 
@@ -52,11 +52,12 @@ class Exporter(object):
             mname = module.__name__
             mdict = module.__dict__
 
-            impnames = [
-                name
-                for name in mdict.get("__all__", mdict)
-                if not name.startswith("_")
-            ]
+            if "__all__" in mdict:
+                impnames = tuple(mdict["__all__"])
+            else:
+                impnames = [
+                    name for name in mdict if not name.startswith("_")
+                ]
 
             for impname in impnames:
                 if impname in self._all:
@@ -69,7 +70,7 @@ class Exporter(object):
 # from imp import export
 _export = Exporter(globals())
 _export(Exporter)
-_export(ExportException)
+_export(ExportError)
 
 
 
