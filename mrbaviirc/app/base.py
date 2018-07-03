@@ -116,7 +116,7 @@ class AppRef(BaseRef):
 
 
 @export
-class AppHelper(object):
+class BaseAppHelper(object):
     """ The application helper oject. """
 
     # Provide access to the global instance as well as named instances
@@ -330,4 +330,7 @@ class AppHelper(object):
     def main(self):
         """ Run application main code here. """
         raise NotImplementedError
+
+# Right now AppHelper is BaseAppHelper
+AppHelper = BaseAppHelper
 
