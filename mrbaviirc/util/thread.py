@@ -13,9 +13,11 @@ import weakref
 from ..constants import SENTINEL
 from .imp import Exporter
 
+
 export = Exporter(globals())
 
 
+@export
 class threadattr(object):
     """ Class for thread-local class members. """
 
@@ -24,29 +26,28 @@ class threadattr(object):
         self._vars = threading.local()
         self._defval = defval
 
-    @property
-    def _data(self):
-        try:
-            return self._vars.data
-        except AttributeError:
-            data = self._vars.data = weakref.WeakKeyDictionary()
-            return data
-
     def __get__(self, instance, owner):
         assert(instance is not None)
-
         try:
-            return self._data[instance]
-        except KeyError:
+            return self._vars.data[instance]
+        except (KeyError, AttributeError):
             if self._defval is not SENTINEL:
                 return self._defval
             else:
-                raise AttributeError("Thread-local storage value not yet set.")
+                raise AttributeError("Thread-local attribute value not yet set.")
 
     def __set__(self, instance, value):
         assert(instance is not None)
-        self._data[instance] = value
+        try:
+            v = self._vars.data
+        except AttributeError:
+            v = self._vars.data = weakref.WeakKeyDictionary()
+
+        v[instance] = value
 
     def __delete__(self, instance):
-        self._data.pop(instance, None)
+        try:
+            self._vars.data.pop(instance, None)
+        except AttributeError:
+            pass
 
