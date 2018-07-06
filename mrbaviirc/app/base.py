@@ -8,116 +8,21 @@ __license__     =   "Apache License 2.0"
 
 
 import threading
-import argparse
 
 
 from ..constants import SENTINEL
-
-
 from ..util.imp import Exporter
-from ..util.functools import lazyprop
+from ..util.functools import lazyprop, lazypropro
 from ..pattern.event import Events
-
 from .path import AppPath
-from .argparse import ArgumentParser
 
 
 export = Exporter(globals())
 
 
 @export
-class BaseRef(object):
-    """ A base class for references used in App config/service registry. """
-
-    def resolve(self, helper, args, kwargs):
-        raise NotImplementedError
-
-
-@export
-class ConfigRef(BaseRef):
-    """ Reference a configuration item. """
-
-    def __init__(self, name, defval=SENTINEL):
-        self.name = name
-        self.defval = defval
-
-    def resolve(self, helper, args, kwargs):
-        return helper.getconfig(self.name, self.defval, args, kwargs)
-
-
-@export
-class ServiceRef(BaseRef):
-    """ Reference a service item. """
-
-    def __init__(self, name, *args, **kwargs):
-        self.name = name
-        self.args = args
-        self.kwargs = kwargs
-
-    def resolve(self, helper, args, kwargs):
-        newargs = helper.evalconfig(self.args, args, kwargs)
-        newkwargs = helper.evalconfig(self.kwargs, args, kwargs)
-        return helper.resolve(self.name, newargs, newkwargs)
-
-
-@export
-class FuncRef(BaseRef):
-    """ Evaluate a function to determine a value. """
-
-    def __init__(self, func):
-        self.func = func
-
-    def resolve(self, helper, args, kwargs):
-        return helper.evalconfig(self.func(), args, kwargs)
-
-
-@export
-class StorageRef(BaseRef):
-    """ Return a value from storage. """
-
-    def __init__(self, name, defval=SENTINEL):
-        self.name = name
-        self.defval = defval
-
-    def resolve(self, helper, args, kwargs):
-        return helper.recall(self.name, self.defval)
-
-
-@export
-class PosRef(BaseRef):
-    """ Represent a positional argument to resolve. """
-
-    def __init__(self, pos):
-        self.pos = pos
-
-    def resolve(self, helper, args, kwargs):
-        return args[self.pos]
-
-
-@export
-class KeyRef(BaseRef):
-    """ Represent a keyword argument to resolve. """
-
-    def __init__(self, key):
-        self.key = key
-
-    def resolve(self, helper, args, kwargs):
-        return kwargs(self.key)
-
-@export
-class AppRef(BaseRef):
-    """ Represent the current apphelper instance. """
-
-    def __init__(self):
-        pass
-
-    def resolve(self, helper, args, kwargs):
-        return helper
-
-
-@export
 class BaseAppHelper(object):
-    """ The application helper oject. """
+    """ The base application helper oject. """
 
     # Provide access to the global instance as well as named instances
     __instances = {}
@@ -126,7 +31,8 @@ class BaseAppHelper(object):
     @classmethod
     def get(cls, name=None):
         """ Return the instance of the app helper. """
-        return cls.__instances.get(name, None)
+        with cls.__lock:
+            return cls.__instances.get(name, None)
 
     @classmethod
     def set(cls, instance, name=None):
@@ -156,78 +62,59 @@ class BaseAppHelper(object):
 
     def setup(self):
         """ Setup configs and registry here. """
+        self.config("appname", lambda: self.appname)
+        self.config("appversion", lambda: self.appversion)
 
-        self.config("appname", FuncRef(lambda: self.appname))
-        self.config("appversion", FuncRef(lambda: self.appversion))
+        self.register("path", lambda: AppPath(self.appname, self.appversion))
 
-        self.register(
-            "path",
-            AppPath,
-            (
-                ConfigRef("appname"),
-                ConfigRef("appversion")
-            )
-        )
 
-    # Service/config registry
+    # Basic config and service registry
 
     def config(self, name, value):
         """ Update our configurations. """
         self._configs[name] = value
 
-    def register(self, name, factory, args=(), kwargs={}, single=True):
-        """ Registry a given service. """
-        self._registry[name] = (factory, args, kwargs, single)
-
-    def resolve(self, name, *args, **kwargs):
-        """ Resolve a given service. """
-        if not name in self._registry:
-            raise KeyError("No such service: {0}".format(str(name)))
-
-        (regfactory, regargs, regkwargs, single) = self._registry[name]
-
-        if single and name in self._services:
-            return self._services[name]
-
-        if isinstance(regfactory, (str, BaseRef)):
-            regfactory = self.evalconfig(regfactory, args, kwargs)
-
-        # Get our args
-        factory_args = self.evalconfig(regargs, args, kwargs)
-        factory_kwargs = self.evalconfig(regkwargs, args, kwargs)
-
-        # Create the result
-        result = regfactory(*factory_args, **factory_kwargs)
-        if single:
-            self._services[name] = result
-
-        return result
-
-    def getconfig(self, config, defval=SENTINEL, args=(), kwargs={}):
+    def get_config(self, config, defval=SENTINEL):
         """ Get the value of a config. """
         if config in self._configs:
-            return self.evalconfig(self._configs[config], args, kwargs)
+            return self.eval_config(self._configs[config], args, kwargs)
         elif defval is not _SENTNEL:
-            return self.evalconfig(defval, args, kwargs)
+            return self.eval_config(defval, args, kwargs)
         else:
             raise KeyError("No such config: {0}".format(config))
 
-    def evalconfig(self, what, args=(), kwargs={}):
+    def eval_config(self, what):
         """ Recursively resolve a configuration. """
 
         if isinstance(what, tuple):
-            return tuple(self.evalconfig(i, args, kwargs) for i in what)
+            return tuple(self.eval_config(i) for i in what)
         elif isinstance(what, list):
-            return list(self.evalconfig(i, args, kwargs) for i in what)
+            return list(self.eval_config(i) for i in what)
         elif isinstance(what, dict):
-            return {i: self.evalconfig(what[i], args, kwargs) for i in what}
-        elif isinstance(what, BaseRef):
-            return what.resolve(self, args, kwargs)
+            return {i: self.eval_config(what[i]) for i in what}
+        elif callable(what):
+            return self.eval_config(what())
         else:
+            # TODO: handle config strings in the form "%CONFVAR% and %%"
             return what
+
+    def register(self, name, factory):
+        """ Registry a given service. """
+        self._registry[name] = factory
+
+    def get_service(self, name):
+        if not name in self._registry:
+            raise KeyError("No such service {0}".format(str(name)))
+
+        with self._lock:
+            if not name in self._services:
+                factory = self._registry[name]
+                self._services[name] = factory()
+        return self._services[name]
 
 
     # Event listeners
+    # Threads?
     def listen(self, event, callback):
         return self.event.listen(event, callback)
 
@@ -238,6 +125,7 @@ class BaseAppHelper(object):
         self.event.remove(cbid)
 
     # Value storage
+    # How to handle threads?
     def remember(self, name, value, timeout=0):
         self._storage[name] = value
 
@@ -282,41 +170,18 @@ class BaseAppHelper(object):
         """ Return the application description. """
         return self.displayname
 
-    @lazyprop
-    def args(self):
-        """ Return the command line. arguments. """
-        return self.parse_args()
-
     @property
     def path(self):
         """ Return the application paths."""
-        return self.resolve("path")
+        return self.get_service("path")
 
-    @lazyprop
+    @lazypropro
     def event(self):
         """ Return events object. """
         return Events()
 
 
-    def create_arg_parser(self):
-        """ Create and return the command line argument parser. """
-        parser = ArgumentParser(description=self.description)
-
-        return parser
-
-    def parse_args(self):
-        """ Parse the command line arguments. """
-        parser = self.create_arg_parser()
-
-        return parser.parse_args()
-
     # Execution related methods. """
-
-    def execute(self):
-        """ External method to execute the application. """
-        self.startup()
-        self.main()
-        self.shutdown()
 
     def startup(self):
         """ Perform startup here. """
@@ -326,11 +191,4 @@ class BaseAppHelper(object):
         """ Perform shutdown here. """
         pass
 
-
-    def main(self):
-        """ Run application main code here. """
-        raise NotImplementedError
-
-# Right now AppHelper is BaseAppHelper
-AppHelper = BaseAppHelper
 

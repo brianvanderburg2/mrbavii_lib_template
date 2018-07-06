@@ -12,6 +12,8 @@ from ..util.imp import Exporter
 export = Exporter(globals())
 
 export.extend(".base")
+export.extend(".app")
+#export.extend(".web")
 export.extend(".argparse")
 export.extend(".path")
 
