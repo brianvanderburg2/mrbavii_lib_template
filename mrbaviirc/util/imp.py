@@ -8,7 +8,6 @@ __license__     =   "Apache License 2.0"
 import sys
 import pkgutil
 import importlib
-import types
 
 
 class ExportError(Exception):
@@ -75,16 +74,28 @@ _export(ExportError)
 
 
 @_export
-def import_submodules(package_name, recursive=False):
-    """ Import submodules and return a dictionary of name:module """
+def import_submodules(package, recursive=False, absolute=False):
+    """ Import submodules and return a tuple of (name,module) """
 
-    package = sys.modules[package_name]
+    # We must pass the package prefix to walk_packages else when it calls
+    # iter_modules it will not have the full module path and doesn't seem
+    # to load submodules of found packages correctly if at all.
+
+    if isinstance(package, str):
+        package = importlib.import_module(package)
+
     func = pkgutil.walk_packages if recursive else pkgutil.iter_modules
+    prefix = package.__name__ + "."
+    prefix_len = len(prefix)
 
-    return {
-        name: importlib.import_module(package_name + "." + name)
-        for (loader, name, ispkg) in func(package.__path__)
-    }
+    # Return a tuple of tuples (name, module)
+    return tuple(
+        (name if absolute else name[prefix_len:], importlib.import_module(name))
+        for (loader, name, ispkg) in func(package.__path__, prefix)
+    )
+
+    return loaded
+
 
 @_export
 def import_submodules_symbols(package_name, symbol, recursive=False):
@@ -92,8 +103,8 @@ def import_submodules_symbols(package_name, symbol, recursive=False):
     submodules = import_submodules(package_name, recursive)
     
     results = []
-    for name in submodules:
-        value = getattr(submodules[name], symbol, None)
+    for (name, module) in submodules:
+        value = getattr(module, symbol, None)
         if(value):
             results.append(value)
 
@@ -111,9 +122,7 @@ def import_submodules_symbolref(package_name, symbol, recursive=False):
 
     submodules = import_submodules(package_name, recursive)
     results = []
-    for name in submodules:
-        module = submodules[name]
-
+    for (name, module) in submodules:
         value = getattr(module, symbol, None)
         if value is None:
             continue
@@ -122,7 +131,7 @@ def import_submodules_symbolref(package_name, symbol, recursive=False):
             value = [value]
 
         for item in value:
-            if isinstance(item, types.StringTypes):
+            if isinstance(item, str):
                 item = getattr(module, item, None)
 
             if item is not None:
