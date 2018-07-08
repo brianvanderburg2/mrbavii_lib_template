@@ -15,13 +15,14 @@ from ..util.imp import Exporter
 from ..util.functools import lazyprop, lazypropro
 from ..pattern.event import Events
 from .path import AppPath
-
+from ..mixin.config import ConfigMixin
+from ..mixin.service import ServiceContainerMixin
 
 export = Exporter(globals())
 
 
 @export
-class BaseAppHelper(object):
+class BaseAppHelper(ConfigMixin, ServiceContainerMixin):
     """ The base application helper oject. """
 
     # Provide access to the global instance as well as named instances
@@ -43,78 +44,34 @@ class BaseAppHelper(object):
             return cur
 
     # Initialization
-
     def __init__(self):
-        """ Initialize.  Note the construction shouldn't perform any active
-            opterations, it's really just a place to specify configurations.
         """
+            Initialize.  Note the construction shouldn't perform any active
+            operations, it's really just a place to specify configurations.
+        """
+
+        ConfigMixin.__init__(self)
+        ServiceContainerMixin.__init__(self)
+
         self.set(self) # Set as the global instance
 
         self._lock = threading.RLock()
         self._local = threading.local()
         self._main_thread = threading.current_thread()
-        self._configs = {}
-        self._registry = {}
-        self._services = {}
         self._storage = {}
 
         self.setup()
 
     def setup(self):
         """ Setup configs and registry here. """
-        self.config("appname", lambda: self.appname)
-        self.config("appversion", lambda: self.appversion)
+        self.set_config("appname", lambda: self.appname)
+        self.set_config("appversion", lambda: self.appversion)
 
-        self.register("path", lambda: AppPath(self.appname, self.appversion))
-
-
-    # Basic config and service registry
-
-    def config(self, name, value):
-        """ Update our configurations. """
-        self._configs[name] = value
-
-    def get_config(self, config, defval=SENTINEL):
-        """ Get the value of a config. """
-        if config in self._configs:
-            return self.eval_config(self._configs[config], args, kwargs)
-        elif defval is not _SENTNEL:
-            return self.eval_config(defval, args, kwargs)
-        else:
-            raise KeyError("No such config: {0}".format(config))
-
-    def eval_config(self, what):
-        """ Recursively resolve a configuration. """
-
-        if isinstance(what, tuple):
-            return tuple(self.eval_config(i) for i in what)
-        elif isinstance(what, list):
-            return list(self.eval_config(i) for i in what)
-        elif isinstance(what, dict):
-            return {i: self.eval_config(what[i]) for i in what}
-        elif callable(what):
-            return self.eval_config(what())
-        else:
-            # TODO: handle config strings in the form "%CONFVAR% and %%"
-            return what
-
-    def register(self, name, factory):
-        """ Registry a given service. """
-        self._registry[name] = factory
-
-    def get_service(self, name):
-        if not name in self._registry:
-            raise KeyError("No such service {0}".format(str(name)))
-
-        with self._lock:
-            if not name in self._services:
-                factory = self._registry[name]
-                self._services[name] = factory()
-        return self._services[name]
-
+        self.register_service("path", lambda: AppPath(self.appname, self.appversion))
 
     # Event listeners
     # Threads?
+    # TODO: move to mixin
     def listen(self, event, callback):
         return self.event.listen(event, callback)
 
