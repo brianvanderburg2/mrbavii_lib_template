@@ -15,20 +15,36 @@ class DerivedAppHelper(base.BaseAppHelper):
     def appname(self):
         return "Test"
 
-def test_register_service():
+def test_register_singleton():
     helper = DerivedAppHelper()
 
     called = [0]
     def db():
         called[0] += 1
         return 100
-    helper.register_service("db", db)
+    helper.register_singleton("db", db)
 
     assert called[0] == 0
-    assert helper.get_service("db") == 100
+    assert helper.resolve_service("db") == 100
     assert called[0] == 1
-    assert helper.get_service("db") == 100
+    assert helper.resolve_service("db") == 100
     assert called[0] == 1
+
+def test_register_factory():
+    helper = DerivedAppHelper()
+
+    called = [0]
+    def db():
+        called[0] += 1
+        return 100
+    helper.register_factory("db", db)
+
+    assert called[0] == 0
+    assert helper.resolve_service("db") == 100
+    assert called[0] == 1
+    assert helper.resolve_service("db") == 100
+    assert called[0] == 2
+
 
 def test_path():
     helper = DerivedAppHelper()

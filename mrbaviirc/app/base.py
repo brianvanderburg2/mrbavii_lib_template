@@ -67,7 +67,7 @@ class BaseAppHelper(ConfigMixin, ServiceContainerMixin):
         self.set_config("appname", lambda: self.appname)
         self.set_config("appversion", lambda: self.appversion)
 
-        self.register_service("path", lambda: AppPath(self.appname, self.appversion))
+        self.register_singleton("path", lambda: AppPath(self.appname, self.appversion))
 
     # Event listeners
     # Threads?
@@ -130,7 +130,7 @@ class BaseAppHelper(ConfigMixin, ServiceContainerMixin):
     @property
     def path(self):
         """ Return the application paths."""
-        return self.get_service("path")
+        return self.resolve_service("path")
 
     @lazypropro
     def event(self):

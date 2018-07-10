@@ -27,26 +27,34 @@ class ServiceContainerMixin(object):
         self._service_instances = {}
         self._service_lock = threading.RLock()
     
-    def register_service(self, name, factory, single=False):
-        """ Registry a given service. This should occur in the main thread. """
-        self._service_registry[name] = (factory, single)
+    def register_factory(self, name, factory):
+        """ Registry a given service factory. This should occur in the main thread. """
+        self._service_registry[name] = (factory, False)
+
+    def register_singleton(self, name, factory):
+        """ Registry a given service factory which should be resolved only once
+        This should occur in the main thread. """
+        self._service_registry[name] = (factory, True)
 
     def unregister_service(self, name):
         """ Remove a registered service. This should occur in the main thread. """
         self._service_registry.pop(name, None)
         self.clear_service(name)
 
-    def get_service(self, name):
+    def resolve_service(self, name, *args, **kwargs):
         """ Get the service instance. """
         if not name in self._service_registry:
             raise KeyError("No such service {0}".format(str(name)))
 
         with self._service_lock:
-            (factory, single) = self._service_registry[name]
+            (factory, singleton) = self._service_registry[name]
 
-            if single:
+            if not singleton:
                 # We always create a new object and never store it
-                return factory()
+                return factory(*args, **kwargs)
+
+            # If it is a singleton, we should not pass any arguments
+            assert(len(args) == 0 and len(kwargs) == 0)
 
             if name in self._service_instances:
                 return self._service_instances[name]
@@ -65,4 +73,8 @@ class ServiceContainerMixin(object):
         with self._service_lock:
             self._service_instances.clear()
 
-   
+    def set_service(self, name, instance):
+        """ Manually set the instance. """
+        with self._service_lock:
+            self._service_instances[name] = instance
+
